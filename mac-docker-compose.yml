@@ -1,0 +1,53 @@
+version: "3.8"
+services:
+  pdf_paragraphs_extraction_api:
+    container_name: pdf_paragraphs_extraction_api
+    entrypoint: [ "gunicorn", "-k", "uvicorn.workers.UvicornWorker", "--chdir", "./src", "app:app", "--bind", "0.0.0.0:5051", "--timeout", "300" ]
+    init: true
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - data:/app/docker_volume
+    depends_on:
+      - mongo_paragraphs
+      - redis_paragraphs
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - SENTRY_DSN=${SENTRY_DSN:-}
+    networks:
+      - pdf_paragraphs_extraction_network
+    ports:
+      - "5051:5051"
+    env_file: .env.mac
+  pdf_paragraphs_extraction_worker:
+    container_name: pdf_paragraphs_extraction_worker
+    entrypoint: [ "python", "-m", "src.QueueProcessor" ]
+    init: true
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - data:/app/docker_volume
+    depends_on:
+      - mongo_paragraphs
+      - redis_paragraphs
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - SENTRY_DSN=${SENTRY_DSN:-}
+    networks:
+      - pdf_paragraphs_extraction_network
+    env_file: .env.mac
+  mongo_paragraphs:
+    restart: unless-stopped
+    command: mongod --port 28017
+    image: "mongo:4.0.1"
+    networks:
+      - pdf_paragraphs_extraction_network
+networks:
+  pdf_paragraphs_extraction_network:
+
+volumes:
+  data:
